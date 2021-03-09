@@ -55,7 +55,7 @@ jobs:
           name: model
           path: models
   print:
-    name: Print hihihi
+      name: Print hihihi
       runs-on: ubuntu-latest
       needs: [data-validation]
       run: echo "hihihi"
