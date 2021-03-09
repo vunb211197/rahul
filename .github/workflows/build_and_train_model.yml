@@ -1,5 +1,8 @@
 name: Build and Deploy
-on: [pull_request]
+on:
+  push:
+    branches:
+    - 'VuNB'
 
 jobs:
 
@@ -27,13 +30,7 @@ jobs:
       needs: [data-validation]
       steps:
       - uses: actions/checkout@v1
-      - id: files
-        uses: jitterbit/get-changed-files@v1
       - name: set_training
-        if: |
-            contains(  steps.files.outputs.all, 'data/' ) 
-            || contains(  steps.files.outputs.all, 'config.yml' ) 
-            || contains(  steps.files.outputs.all, 'domain.yml' )
         run: echo "RUN_TRAINING=true"  >> $GITHUB_ENV
       - name: Set up Python 3.7
         if: env.RUN_TRAINING == 'true'
@@ -52,8 +49,7 @@ jobs:
           rasa train
       - name: Upload model
         if: |
-            github.ref == 'refs/heads/main'
-            && env.RUN_TRAINING == 'true'
+            env.RUN_TRAINING == 'true'
         uses: actions/upload-artifact@main
         with:
           name: model
