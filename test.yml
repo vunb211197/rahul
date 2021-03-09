@@ -1,0 +1,205 @@
+# tên work flow 
+name: Build and Deploy
+# sự kiện kích hoạt trigger 
+on: [pull_request]
+
+# list các jobs :
+
+
+# test lint và type the action code
+# validates data
+# runs NLU cross-validation
+# train model
+# test model
+# Builds and tags an action image
+# push action image lên một cloud google
+
+
+jobs:
+  # test lint 
+  lint-testing:
+    # tên job hiển thị lên github
+    name: Code Formatting Tests
+    # hệ điều hành để thực hiện công việc
+    runs-on: ubuntu-latest
+    # job này chứa chuỗi các công việc
+    steps:
+    # chọn 1 actions để chạy như 1 phần step trong job 
+    - uses: actions/checkout@v1
+    - name: Set up Python 3.7
+      uses: actions/setup-python@v1
+      with:
+        python-version: 3.7
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade "pip<20"
+        pip install -r requirements-dev.txt
+    - name: Code Formatting Tests
+      working-directory: ${{ github.workspace }}
+      run: |
+# chạy cái lệnh này
+        make lint
+  
+  #job type -testing
+  type-testing:
+    name: Type Tests
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v1
+    - name: Set up Python 3.7
+      uses: actions/setup-python@v1
+      with:
+        python-version: 3.7
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade "pip<20"
+        pip install -r requirements-dev.txt
+    - name: Type Checking
+      working-directory: ${{ github.workspace }}
+      run: |
+        make types
+  
+  #job kiểm tra dữ liệu
+  data-validation:
+    name: Data Validation
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v1
+    - name: Set up Python 3.7
+      uses: actions/setup-python@v1
+      with:
+        python-version: 3.7
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade "pip<20"
+        pip install -r requirements-dev.txt
+    - name: Rasa Data Validation
+      working-directory: ${{ github.workspace }}
+      run: |
+# chạy hàm kiểm tra sự mâu thuẫn 
+        rasa data validate --debug
+  
+  # job train và test
+  training-testing:
+    name: Testing Stories
+    runs-on: ubuntu-latest
+    # cần job data_validation xong 
+    needs: [data-validation]
+    steps:
+    - uses: actions/checkout@v1
+    - id: files
+      uses: jitterbit/get-changed-files@v1
+    - name: set_training
+      # nếu các file có chứa data/ , config.yml , domain.yml
+      if: |
+          contains(  steps.files.outputs.all, 'data/' ) 
+          || contains(  steps.files.outputs.all, 'config.yml' ) 
+          || contains(  steps.files.outputs.all, 'domain.yml' )
+      # echo ra cái này => gắn vào biến môi trường
+      run: echo "RUN_TRAINING=true"  >> $GITHUB_ENV
+    - name: Set up Python 3.7
+      # nếu biến môi trường là true
+      if: env.RUN_TRAINING == 'true'
+      uses: actions/setup-python@v1
+      with:
+        python-version: 3.7
+    - name: Install dependencies
+      if: env.RUN_TRAINING == 'true'
+      run: |
+          python -m pip install --upgrade "pip<20"
+          pip install -r requirements-dev.txt
+    # xác thực chéo file nlu 
+    - name: Cross-validate NLU model
+    # định dạng duy nhất cho step 
+      id: cvnlu
+      if: |
+          ( 
+            ( 
+              contains( github.event.pull_request.labels.*.name, 'nlu_testing_required' ) 
+              && contains(  steps.files.outputs.all, 'data/nlu/' ) 
+            )
+            || contains(  steps.files.outputs.all, 'config.yml' ) 
+          )
+      run: |  
+          rasa test nlu -f 3 --cross-validation
+          python .github/workflows/format_results.py
+    - name: post cross-val results to PR
+      if: steps.cvnlu.outcome == 'success'
+      uses: amn41/comment-on-pr@comment-file-contents
+      continue-on-error: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        msg: results.md
+    # step train model
+    - name: Train Model
+      # nếu trainning đã sẵn sàng
+      if: env.RUN_TRAINING == 'true'
+      working-directory: ${{ github.workspace }}
+      # thực hiện rasa train
+      run: |
+        rasa train
+    
+    # test model 
+    - name: Test Training Stories
+      # nếu trong thư mục chứa các file này
+      if: |
+          contains(  steps.files.outputs.all, 'data/core/' ) 
+          || contains(  steps.files.outputs.all, 'config.yml' ) 
+          || contains(  steps.files.outputs.all, 'domain.yml' )
+      working-directory: ${{ github.workspace }}
+      # thực hiện lệnh test model
+      run: |
+        rasa test core --stories test/test_stories.md --fail-on-prediction-errors
+    
+    # step upload model lên 
+    - name: Upload model
+      if: |
+          github.ref == 'refs/heads/main'
+          && env.RUN_TRAINING == 'true'
+      uses: actions/upload-artifact@main
+      with:
+        # các thông số thư mục được up lên
+        name: model
+        path: models
+  # build images lên server 
+  build-images:
+    # tên job build and push images lên server
+    name: Build and Push Images
+    needs: [lint-testing, type-testing, training-testing]
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v1
+    - id: files
+      uses: jitterbit/get-changed-files@v1
+    - name: set_actions
+      if: |
+        contains(  steps.files.outputs.all, 'actions/' ) 
+        || contains(  steps.files.outputs.all, 'Dockerfile' )
+      run: echo "ACTIONS_CHANGED=true" >> $GITHUB_ENV
+    - name: Authenticate into Google Cloud Platform
+      if: env.ACTIONS_CHANGED == 'true'
+      uses: GoogleCloudPlatform/github-actions/setup-gcloud@master
+      with:
+        version: '275.0.0'
+        service_account_key: ${{ secrets.GCLOUD_AUTH }}
+    - name: Configure Docker to use Google Cloud Platform
+      if: env.ACTIONS_CHANGED == 'true'
+      run: |
+        gcloud auth configure-docker
+    - name: Pull Latest Image
+      if: env.ACTIONS_CHANGED == 'true'
+      run: |
+        docker pull gcr.io/replicated-test/rasa-demo:latest || true
+    - name: Build Image
+      if: env.ACTIONS_CHANGED == 'true'
+      run: |
+        docker build --cache-from gcr.io/replicated-test/rasa-demo:latest .
+  mergepal-merge: # run merge pal in the end
+    runs-on: ubuntu-latest
+    needs: [lint-testing, type-testing, training-testing, build-images]
+    steps:
+      - uses: actions/checkout@v1
+      - uses: rasahq/merge-pal-action@v0.5.1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}

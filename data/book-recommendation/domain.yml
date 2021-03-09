@@ -1,0 +1,18 @@
+version: '2.0'
+config:
+  store_entities_as_slots: true
+session_config:
+  session_expiration_time: 60
+  carry_over_slots_to_new_session: true
+intents:
+- greet:
+    use_entities: true
+- book_recommendation:
+    use_entities: true
+entites: []
+slot: []
+responses: {}
+actions:
+- action_recommand_book
+from: []
+e2e_actions: []

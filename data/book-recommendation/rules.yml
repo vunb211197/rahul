@@ -1,0 +1,7 @@
+version: "2.0"
+
+rules:
+- rule: User want read book
+  steps:
+  - intent : book_recommendation
+  - action : action_recommand_book

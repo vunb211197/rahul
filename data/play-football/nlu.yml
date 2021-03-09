@@ -1,0 +1,29 @@
+version: "2.0"
+nlu:
+- intent: flay_football
+  examples: |
+    - i want play football
+    - i want a flay football
+    - flay football
+    - flay soccer
+    - i like football
+    - i like soccer
+    - flay football is very good
+  
+- intent: greet
+  examples: |
+    - hey
+    - hello
+    - hi
+    - hello there
+    - good morning
+    - good evening
+    - moin
+    - hey there
+    - let's go
+    - hey dude
+    - goodmorning
+    - goodevening
+    - good afternoon
+
+

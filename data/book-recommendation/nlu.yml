@@ -1,0 +1,29 @@
+version: "2.0"
+nlu:
+- intent: book_recommendation
+  examples: |
+    - i want read book
+    - i want a book
+    - read book
+    - do you have a book
+    - i like book
+    - i like read book
+    - read book is very good
+  
+- intent: greet
+  examples: |
+    - hey
+    - hello
+    - hi
+    - hello there
+    - good morning
+    - good evening
+    - moin
+    - hey there
+    - let's go
+    - hey dude
+    - goodmorning
+    - goodevening
+    - good afternoon
+
+
