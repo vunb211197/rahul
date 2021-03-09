@@ -49,8 +49,7 @@ jobs:
           rasa train
       - name: Upload model
         if: |
-            github.ref == 'refs/heads/main'
-            && env.RUN_TRAINING == 'true'
+            env.RUN_TRAINING == 'true'
         uses: actions/upload-artifact@main
         with:
           name: model
