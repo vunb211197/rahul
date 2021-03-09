@@ -25,7 +25,7 @@ jobs:
           rasa data validate --debug
 
   training-testing:
-      name: Testing Stories
+      name: Train model Rasa
       runs-on: ubuntu-latest
       needs: [data-validation]
       steps:
@@ -54,3 +54,8 @@ jobs:
         with:
           name: model
           path: models
+  print:
+    name: Print hihihi
+      runs-on: ubuntu-latest
+      needs: [data-validation]
+      run: echo "hihihi"
